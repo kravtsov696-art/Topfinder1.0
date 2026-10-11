@@ -1,0 +1,68 @@
+# iOS: (1) проверка, что нативный проект компилируется (симулятор, без подписи) — без Apple-аккаунта;
+# (2) по кнопке — подписанная сборка через EAS (нужны секреты, см. docs/RUNBOOK.md §iPhone).
+name: ios
+on:
+  workflow_dispatch:
+    inputs:
+      eas_build:
+        description: "Запустить подписанную сборку EAS (preview — Ad Hoc, production — TestFlight)"
+        type: choice
+        options: ["none", "preview", "production"]
+        default: "none"
+      api_url:
+        description: "Адрес сервера (https://...)"
+        required: false
+  push:
+    branches: [main]
+    paths: ["apps/mobile/**", "packages/shared/**", ".github/workflows/ios.yml"]
+
+jobs:
+  compile-check:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+      - name: Prebuild iOS (+ CocoaPods)
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform ios --clean
+      - name: Компиляция для симулятора без подписи
+        working-directory: apps/mobile/ios
+        run: |
+          WS=$(ls -d *.xcworkspace | head -1); SCHEME="${WS%.xcworkspace}"
+          echo "workspace=$WS scheme=$SCHEME"
+          set -o pipefail
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build | tail -40
+
+  eas:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.eas_build != 'none'
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
+      EXPO_PUBLIC_API_URL: ${{ github.event.inputs.api_url || vars.API_URL }}
+      IOS_BUNDLE_ID: ${{ vars.IOS_BUNDLE_ID || 'app.blizkie.p0' }}
+      # Ключ App Store Connect API — позволяет EAS создать сертификаты без интерактивного входа
+      EXPO_ASC_API_KEY_PATH: ${{ github.workspace }}/asc_key.p8
+      EXPO_ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      EXPO_ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      EXPO_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      EXPO_APPLE_TEAM_TYPE: INDIVIDUAL
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+      - name: Ключ ASC
+        run: printf '%s' "${{ secrets.ASC_API_KEY_P8 }}" > asc_key.p8
+      - name: EAS build iOS
+        working-directory: apps/mobile
+        run: |
+          npx eas-cli@latest build --platform ios --profile ${{ github.event.inputs.eas_build }} --non-interactive \
+            ${{ github.event.inputs.eas_build == 'production' && '--auto-submit' || '' }}

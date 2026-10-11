@@ -1,0 +1,86 @@
+# Проверки: тесты сервера на PostGIS, смоук работающего API, типы и сборка JS мобильного приложения,
+# генерация нативных проектов (prebuild) с проверкой разрешений в манифестах.
+name: ci
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: blizkie_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 3s --health-retries 30
+    env:
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/blizkie_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Установка зависимостей только API
+        run: npm install --workspace @blizkie/api --include-workspace-root=false --no-audit --no-fund
+      - name: TypeScript (API + shared)
+        working-directory: apps/api
+        run: npx tsc -p tsconfig.json
+      - name: Тесты API на PostGIS
+        working-directory: apps/api
+        run: npm test
+      - name: Смоук запущенного сервера
+        working-directory: apps/api
+        run: |
+          psql postgres://postgres:postgres@localhost:5432/postgres -c "create database blizkie_smoke"
+          DATABASE_URL=postgres://postgres:postgres@localhost:5432/blizkie_smoke PORT=8080 node src/main.ts > server.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS localhost:8080/health && break; sleep 1; done
+          node test/smoke.ts http://localhost:8080
+          grep -q "PostGIS: да" server.log && echo "PostGIS подключён"
+          cat server.log
+
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Установка зависимостей (workspaces)
+        run: |
+          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+      - name: Сохранить lockfile в репозиторий (первый прогон)
+        if: github.event_name == 'push'
+        run: |
+          if [ -n "$(git status --porcelain package-lock.json)" ]; then
+            git config user.name "ci-bot"; git config user.email "ci-bot@users.noreply.github.com"
+            git add package-lock.json && git commit -m "chore: lockfile из CI" && git push || echo "lockfile не отправлен"
+          fi
+      - name: Совместимость версий с Expo SDK
+        working-directory: apps/mobile
+        run: npx expo install --check
+      - name: TypeScript (мобильное приложение)
+        working-directory: apps/mobile
+        run: npx tsc --noEmit
+      - name: Сборка JS-бандла для Android и iOS (Metro)
+        working-directory: apps/mobile
+        run: npx expo export --platform android --platform ios --output-dir dist-check
+      - name: Prebuild и проверка нативной конфигурации
+        working-directory: apps/mobile
+        run: |
+          npx expo prebuild --no-install --clean
+          M=android/app/src/main/AndroidManifest.xml
+          for p in ACCESS_FINE_LOCATION ACCESS_COARSE_LOCATION ACCESS_BACKGROUND_LOCATION FOREGROUND_SERVICE FOREGROUND_SERVICE_LOCATION; do
+            grep -q "android.permission.$p" $M || (echo "НЕТ $p в манифесте" && exit 1); echo "ok $p"; done
+          P=$(ls ios/*/Info.plist | head -1)
+          grep -A3 UIBackgroundModes "$P" | grep -q location && echo "ok UIBackgroundModes=location"
+          grep -q NSLocationAlwaysAndWhenInUseUsageDescription "$P" && echo "ok NSLocationAlways…"
+          ! grep -q aps-environment ios/*/*.entitlements 2>/dev/null && echo "ok: нет push-entitlement (подпись бесплатным Apple ID возможна)"

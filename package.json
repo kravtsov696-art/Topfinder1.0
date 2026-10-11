@@ -1,0 +1,23 @@
+{
+  "name": "blizkie",
+  "version": "0.1.0",
+  "private": true,
+  "description": "«Близкие» P0 — испытательный стенд обмена геолокацией iPhone ↔ Android",
+  "type": "module",
+  "workspaces": [
+    "apps/api",
+    "apps/mobile",
+    "packages/shared"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "api:start": "npm --workspace @blizkie/api run start",
+    "api:test": "npm --workspace @blizkie/api run test",
+    "api:smoke": "npm --workspace @blizkie/api run smoke",
+    "api:typecheck": "npm --workspace @blizkie/api run typecheck",
+    "mobile:typecheck": "npm --workspace @blizkie/mobile run typecheck",
+    "report": "node scripts/summarize.ts"
+  }
+}

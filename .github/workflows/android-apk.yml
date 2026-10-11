@@ -1,0 +1,57 @@
+# Сборка устанавливаемого Android APK (release-сборка с JS внутри, подписана debug-ключом —
+# только для тестовой установки, не для Google Play). Результат: артефакт + GitHub Release «p0-android».
+name: android-apk
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: "Адрес сервера (https://...) — будет подставлен по умолчанию"
+        required: false
+  push:
+    branches: [main]
+    paths: ["apps/mobile/**", "packages/shared/**", ".github/workflows/android-apk.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Зависимости
+        run: |
+          if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+      - name: Prebuild Android
+        working-directory: apps/mobile
+        env:
+          EXPO_PUBLIC_API_URL: ${{ github.event.inputs.api_url || vars.API_URL }}
+        run: npx expo prebuild --platform android --no-install --clean
+      - name: Gradle assembleRelease
+        working-directory: apps/mobile/android
+        env:
+          EXPO_PUBLIC_API_URL: ${{ github.event.inputs.api_url || vars.API_URL }}
+          NODE_ENV: production
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+      - name: Подготовить файл
+        run: |
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk blizkie-p0-${{ github.run_number }}.apk
+          ls -la *.apk
+          "$ANDROID_HOME"/build-tools/*/aapt dump badging blizkie-p0-*.apk | grep -E "package:|uses-permission" | head -20 || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: blizkie-p0-apk
+          path: blizkie-p0-*.apk
+      - name: Опубликовать в Release p0-android
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view p0-android >/dev/null 2>&1 || gh release create p0-android --title "P0 Android (тестовая сборка)" --notes "Тестовая сборка для установки на телефон. Подписана debug-ключом."
+          gh release upload p0-android blizkie-p0-*.apk --clobber

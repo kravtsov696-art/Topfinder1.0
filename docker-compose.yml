@@ -1,0 +1,35 @@
+# Локальный запуск: docker compose up --build
+# API: http://localhost:8080/health  (телефонам нужен HTTPS — см. docs/RUNBOOK.md)
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: blizkie
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-blizkie_local_only}
+      POSTGRES_DB: blizkie
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U blizkie"]
+      interval: 3s
+      retries: 20
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      DATABASE_URL: postgres://blizkie:${POSTGRES_PASSWORD:-blizkie_local_only}@db:5432/blizkie
+      PORT: 8080
+      ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      REGISTRATION_KEY: ${REGISTRATION_KEY:-}
+      LOCATION_TTL_HOURS: ${LOCATION_TTL_HOURS:-24}
+      PUSH_PROVIDER: ${PUSH_PROVIDER:-none}
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  dbdata:

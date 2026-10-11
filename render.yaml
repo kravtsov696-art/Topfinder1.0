@@ -1,0 +1,27 @@
+# Render Blueprint: Dashboard → New → Blueprint → выбрать этот репозиторий.
+# ВНИМАНИЕ (бесплатный план): веб-сервис засыпает после 15 мин без запросов (первый запрос ~30–60 с),
+# бесплатная база удаляется через 30 дней. Для полевых испытаний фона это искажает задержки —
+# см. docs/KNOWN_LIMITATIONS.md. Для замеров лучше VPS (deploy/vps) или платный план.
+services:
+  - type: web
+    name: blizkie-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: blizkie-db
+          property: connectionString
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: LOCATION_TTL_HOURS
+        value: "24"
+      - key: PUSH_PROVIDER
+        value: none
+databases:
+  - name: blizkie-db
+    plan: free
+    postgresMajorVersion: "16"
