@@ -32,7 +32,7 @@ jobs:
       - name: Компиляция для симулятора без подписи
         working-directory: apps/mobile/ios
         run: |
-          ls /Applications | grep -i xcode | tr "\n" " "; echo
+          echo "::notice::Xcodes: $(ls /Applications | grep -i xcode | tr "\n" " ") current: $(xcodebuild -version | tr "\n" " ")"
           xcodebuild -version
           WS=$(ls -d *.xcworkspace | head -1); SCHEME="${WS%.xcworkspace}"
           echo "workspace=$WS scheme=$SCHEME"
