@@ -7,7 +7,7 @@
 - Linux-контейнер без доступа к реестру npm, Google Maven, Android SDK, Expo API и без Docker-демона. Доступен только GitHub (git clone публичных репозиториев).
 - Поэтому: сервер проверен на **настоящем PostgreSQL 16** (локальный кластер, **без PostGIS** — ветка миграции «без PostGIS»); драйвер `postgres` 3.4.9 взят из его GitHub-репозитория.
 - Мобильный код проверен компилятором TypeScript 6.0.3 против **реальных** типов React 19 (DefinitelyTyped), React Native 0.86 (`0.86-stable`), `expo-location` SDK 57 (исходники `sdk-57`) и вручную написанных заглушек для остальных модулей (сигнатуры сверены с исходниками SDK 57). Это ловит опечатки и неверные параметры, но **не** доказывает, что приложение собирается и работает.
-- Сборка APK/iOS, `expo install --check`, Metro-бандл и `expo prebuild` вынесены в GitHub Actions (`.github/workflows`), **ни разу ещё не запускались**.
+- Сборка APK/iOS, `expo install --check`, Metro-бандл и `expo prebuild` выполняются в GitHub Actions (`.github/workflows`) — прошли 12.10.2026.
 
 ## Результаты запущенных проверок (точный вывод — в конце файла)
 
@@ -19,9 +19,9 @@
 | `scripts/summarize.ts` на данных живого локального сервера | ✅ CSV + summary.md созданы |
 | `tsc` мобильного кода (реальные типы RN/React/expo-location + заглушки) | ✅ 0 ошибок; контрольная ошибка ловится |
 | Синтаксис YAML (workflows, compose, render), `bash -n install.sh` | ✅ |
-| CI на GitHub (тесты на PostGIS, `expo install --check`, Metro, prebuild) | ⛔ не запускался — нужен репозиторий |
-| Сборка Android APK | ⛔ не запускалась (workflow готов) |
-| Компиляция iOS (симулятор, без подписи) | ⛔ не запускалась (workflow готов, macOS-раннер) |
+| CI на GitHub: тесты API на PostGIS, смоук, `expo install --check`, `tsc` с настоящими зависимостями, Metro-бандл Android+iOS, prebuild + проверка манифестов | ✅ 12.10.2026, все шаги зелёные |
+| Сборка Android APK (release, debug-подпись) | ✅ собран, Release `p0-android` |
+| Компиляция iOS (Xcode 26.3, симулятор, без подписи) | ✅ после патча expo-modules-jsi 57.1.1 (исправление из expo sdk-57, PR #51040; `patches/`) |
 | Подписанная iOS-сборка | ⛔ нужен Apple Developer или Mac + Apple ID |
 | Docker-образ API, VPS-установка, Render | 🟡 файлы готовы, не запускались |
 
