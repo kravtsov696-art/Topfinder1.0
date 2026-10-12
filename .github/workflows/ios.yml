@@ -26,6 +26,8 @@ jobs:
           node-version: 22
       - run: |
           if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+      - name: Xcode 26 (Expo SDK 57 требует Swift 6.2)
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_26*.app | sort -V | tail -1)" && xcodebuild -version
       - name: Prebuild iOS (+ CocoaPods)
         working-directory: apps/mobile
         run: npx expo prebuild --platform ios --clean
