@@ -32,6 +32,8 @@ jobs:
       - name: Компиляция для симулятора без подписи
         working-directory: apps/mobile/ios
         run: |
+          ls /Applications | grep -i xcode | tr "\n" " "; echo
+          xcodebuild -version
           WS=$(ls -d *.xcworkspace | head -1); SCHEME="${WS%.xcworkspace}"
           echo "workspace=$WS scheme=$SCHEME"
           xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator \
@@ -39,7 +41,7 @@ jobs:
           tail -40 build.log
           if [ "$ok" != 1 ]; then
             # ошибки — в аннотации, чтобы их было видно через API без скачивания логов
-            grep -E "error:|fatal|FAILED|Command .* failed" build.log | sort -u | head -40 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
+            { grep -E "error:|fatal|FAILED|Command .* failed" build.log | sort -u | head -30; grep -A12 "Could not resolve" build.log | head -30; xcodebuild -version; }  | while IFS= read -r l; do echo "::error::${l:0:900}"; done
             exit 1
           fi
 
