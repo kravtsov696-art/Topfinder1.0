@@ -29,6 +29,7 @@ jobs:
       - name: Зависимости
         run: |
           if [ -f package-lock.json ]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+          node scripts/apply-patches.mjs
       - name: Prebuild Android
         working-directory: apps/mobile
         env:
