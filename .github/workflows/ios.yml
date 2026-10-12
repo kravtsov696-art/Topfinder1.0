@@ -34,9 +34,14 @@ jobs:
         run: |
           WS=$(ls -d *.xcworkspace | head -1); SCHEME="${WS%.xcworkspace}"
           echo "workspace=$WS scheme=$SCHEME"
-          set -o pipefail
           xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build | tail -40
+            -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build > build.log 2>&1 && ok=1 || ok=0
+          tail -40 build.log
+          if [ "$ok" != 1 ]; then
+            # ошибки — в аннотации, чтобы их было видно через API без скачивания логов
+            grep -E "error:|fatal|FAILED|Command .* failed" build.log | sort -u | head -40 | while IFS= read -r l; do echo "::error::${l:0:900}"; done
+            exit 1
+          fi
 
   eas:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.eas_build != 'none'
