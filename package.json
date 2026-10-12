@@ -18,6 +18,7 @@
     "api:smoke": "npm --workspace @blizkie/api run smoke",
     "api:typecheck": "npm --workspace @blizkie/api run typecheck",
     "mobile:typecheck": "npm --workspace @blizkie/mobile run typecheck",
-    "report": "node scripts/summarize.ts"
+    "report": "node scripts/summarize.ts",
+    "postinstall": "node scripts/apply-patches.mjs"
   }
 }

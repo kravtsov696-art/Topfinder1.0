@@ -14,7 +14,7 @@ on:
         required: false
   push:
     branches: [main]
-    paths: ["apps/mobile/**", "packages/shared/**", ".github/workflows/ios.yml"]
+    paths: ["apps/mobile/**", "packages/shared/**", "patches/**", "scripts/apply-patches.mjs", ".github/workflows/ios.yml"]
 
 jobs:
   compile-check:
